@@ -668,8 +668,6 @@
 // };
 
 // export default Table;
-
-
 import React, { useState, useEffect, useRef } from "react";
 import "./table.scss";
 import { Link, useNavigate, useLocation } from "react-router-dom";
@@ -703,14 +701,6 @@ const Table = ({ data, payment, hide, filterBtn, groupData }) => {
     return {
       budget: params.get("budget") || "2",
       filter: params.get("filter") || "0",
-      monthFilter:
-        params.get("month") ||
-        (() => {
-          const currentDate = new Date();
-          return `${currentDate.getFullYear()}-${String(
-            currentDate.getMonth() + 1
-          ).padStart(2, "0")}`;
-        })(),
       page: parseInt(params.get("page")) || 1,
     };
   };
@@ -719,13 +709,6 @@ const Table = ({ data, payment, hide, filterBtn, groupData }) => {
 
   const [budget, setBudget] = useState("2"); // 2 = barchasi, 1 = to'lov qilgan, -1 = qilmagan
   const [filter, setFilter] = useState("0"); // 0 = barchasi, boshqalar group id bo'ladi
-  const [monthFilter, setMonthFilter] = useState(() => {
-    // Joriy oyni default qilib o'rnatish
-    const currentDate = new Date();
-    return `${currentDate.getFullYear()}-${String(
-      currentDate.getMonth() + 1
-    ).padStart(2, "0")}`;
-  });
   const [page, setPage] = useState(1);
   const [isExporting, setIsExporting] = useState(false);
   const [deleteStudent, { isLoading: isDeleting }] = useDeleteStudentMutation();
@@ -778,67 +761,14 @@ const Table = ({ data, payment, hide, filterBtn, groupData }) => {
   // Pagination uchun constants
   const ITEMS_PER_PAGE = 10;
 
-  const getAvailableMonths = () => {
-    const months = new Set();
-
-    data?.forEach((student) => {
-      student.payments?.forEach((payment) => {
-        if (payment.monthFor) {
-          months.add(payment.monthFor);
-        }
-      });
-    });
-
-    const currentYear = new Date().getFullYear();
-    const years = [currentYear - 1, currentYear, currentYear + 1];
-
-    years.forEach((year) => {
-      for (let month = 1; month <= 12; month++) {
-        const monthStr = `${year}-${String(month).padStart(2, "0")}`;
-        months.add(monthStr);
-      }
-    });
-
-    return Array.from(months).sort().reverse(); // Eng yangi oyni birinchi qo'yish
-  };
-
-  const formatMonthName = (monthString) => {
-    if (!monthString) return "";
-    const [year, month] = monthString.split("-");
-    const months = [
-      "Yanvar",
-      "Fevral",
-      "Mart",
-      "Aprel",
-      "May",
-      "Iyun",
-      "Iyul",
-      "Avgust",
-      "Sentabr",
-      "Oktabr",
-      "Noyabr",
-      "Dekabr",
-    ];
-    return `${months[parseInt(month) - 1]} ${year}`;
-  };
-
   // Filterlangan data
   const filteredData = data
     ?.filter((el) => {
       // To'lov holati bo'yicha filter
       if (budget === "1") {
-        return el?.payments?.some(
-          (p) => p.monthFor === monthFilter && p.paid === true
-        );
+        return el?.payments?.some((p) => p.paid === true);
       } else if (budget === "-1") {
-        const hasPaymentForMonth = el?.payments?.find(
-          (p) => p.monthFor === monthFilter
-        );
-        if (hasPaymentForMonth) {
-          return hasPaymentForMonth.paid === false;
-        } else {
-          return true;
-        }
+        return !el?.payments?.some((p) => p.paid === true);
       }
       return true;
     })
@@ -871,16 +801,14 @@ const Table = ({ data, payment, hide, filterBtn, groupData }) => {
 
   // Filter o'zgarishini kuzatish va URL yangilash
   useEffect(() => {
-    updateUrl({ budget, filter, month: monthFilter, page });
-  }, [budget, filter, monthFilter, page]);
+    updateUrl({ budget, filter, page });
+  }, [budget, filter, page]);
 
   // URL o'zgarishini kuzatish
   useEffect(() => {
     const newParams = getUrlParams();
     if (newParams.budget !== budget) setBudget(newParams.budget);
     if (newParams.filter !== filter) setFilter(newParams.filter);
-    if (newParams.monthFilter !== monthFilter)
-      setMonthFilter(newParams.monthFilter);
     if (newParams.page !== page) setPage(newParams.page);
   }, [location.search]);
 
@@ -969,11 +897,8 @@ const Table = ({ data, payment, hide, filterBtn, groupData }) => {
     try {
       // Prepare data for Excel
       const excelData = filteredData.map((el, index) => {
-        const relevantPayment = el?.payments?.find(
-          (p) => p.monthFor === monthFilter
-        );
-        const isPaid = relevantPayment ? relevantPayment.paid : false;
-        const paymentAmount = relevantPayment?.amount;
+        const isPaid = el?.payments?.some((p) => p.paid === true);
+        const paymentAmount = el?.payments?.find((p) => p.paid === true)?.amount;
 
         const rowData = {
           "№": index + 1,
@@ -996,7 +921,6 @@ const Table = ({ data, payment, hide, filterBtn, groupData }) => {
           rowData["To'lov miqdori"] = paymentAmount
             ? `${Number(paymentAmount).toLocaleString()} so'm`
             : "-";
-          rowData["To'lov oyi"] = formatMonthName(monthFilter);
         }
 
         return rowData;
@@ -1016,7 +940,7 @@ const Table = ({ data, payment, hide, filterBtn, groupData }) => {
       ];
 
       if (payment) {
-        colWidths.push({ wch: 15 }, { wch: 15 }, { wch: 15 });
+        colWidths.push({ wch: 15 }, { wch: 15 });
       }
 
       ws["!cols"] = colWidths;
@@ -1025,10 +949,7 @@ const Table = ({ data, payment, hide, filterBtn, groupData }) => {
       const currentDate = new Date()
         .toLocaleDateString("uz-UZ")
         .replace(/\//g, "-");
-      const filename = `oquvchilar_${formatMonthName(monthFilter).replace(
-        /\s/g,
-        "_"
-      )}_${currentDate}.xlsx`;
+      const filename = `oquvchilar_${currentDate}.xlsx`;
 
       // Android va mobil qurilmalar uchun maxsus usul
       if (isAndroid() || isMobileDevice()) {
@@ -1099,21 +1020,6 @@ const Table = ({ data, payment, hide, filterBtn, groupData }) => {
         <div className="table__select">
           <button>Jami: {filteredData?.length}</button>
 
-          {/* Oy bo'yicha filter */}
-          <select
-            value={monthFilter}
-            onChange={(e) => {
-              setMonthFilter(e.target.value);
-              setPage(1);
-            }}
-          >
-            {getAvailableMonths().map((month) => (
-              <option key={month} value={month}>
-                {formatMonthName(month)}
-              </option>
-            ))}
-          </select>
-
           <select
             value={budget}
             onChange={(e) => {
@@ -1141,7 +1047,6 @@ const Table = ({ data, payment, hide, filterBtn, groupData }) => {
             ))}
           </select>
 
-          {/* Android uchun yangilangan Excel Export Button */}
           <button
             onClick={handleExportToExcel}
             className="table__excel-btn"
@@ -1187,7 +1092,6 @@ const Table = ({ data, payment, hide, filterBtn, groupData }) => {
         </div>
       )}
 
-      {/* Table Rows */}
       <table className="table__row">
         <thead>
           <tr style={{ textAlign: "center" }}>
@@ -1204,11 +1108,8 @@ const Table = ({ data, payment, hide, filterBtn, groupData }) => {
         <tbody>
           {currentPageData?.length > 0 ? (
             currentPageData.map((el, index) => {
-              const relevantPayment = el?.payments?.find(
-                (p) => p.monthFor === monthFilter
-              );
-              const isPaid = relevantPayment ? relevantPayment.paid : false;
-              const paymentAmount = relevantPayment?.amount;
+              const isPaid = el?.payments?.some((p) => p.paid === true);
+              const paymentAmount = el?.payments?.find((p) => p.paid === true)?.amount;
 
               return (
                 <tr key={el?.id}>
@@ -1308,7 +1209,6 @@ const Table = ({ data, payment, hide, filterBtn, groupData }) => {
         </tbody>
       </table>
 
-      {/* Delete Module */}
       {deleteHide && (
         <DeleteModule
           close={() => {
@@ -1321,7 +1221,6 @@ const Table = ({ data, payment, hide, filterBtn, groupData }) => {
         />
       )}
 
-      {/* Pagination har doim ko'rinadi */}
       {filteredData && (
         <div className="table__pagenation">
           <Stack spacing={2}>
@@ -1339,7 +1238,6 @@ const Table = ({ data, payment, hide, filterBtn, groupData }) => {
         </div>
       )}
 
-      {/* Edit Form */}
       {studentEdit && (
         <Module close={setStudentEdit} bg={"#aaa6"}>
           <form className="students__edit" onSubmit={handleEditSubmit}>
