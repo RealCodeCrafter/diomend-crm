@@ -24,7 +24,6 @@ import {
   useGetCoursesQuery,
   useUpdateCourseMutation,
 } from "../../context/api/courseApi";
-
 import { useGetValue } from "../../hooks/useGetValue";
 import toast from "react-hot-toast";
 import DeleteModule from "../../components/deleteModule/DeleteModule";
@@ -44,7 +43,6 @@ const Course = () => {
   const [filterActive, setFilterActive] = useState(false);
 
   const { data } = useGetCoursesQuery();
-  console.log(data);
   const { formData, setFormData, handleChange } = useGetValue(initialState);
   const [createCourse, { data: createData, isSuccess, isError }] =
     useCreateCourseMutation();
@@ -53,18 +51,23 @@ const Course = () => {
 
   const [deleteId, setDeleteId] = useState(null);
   const [deleteHide, setDeleteHide] = useState(false);
-  console.log(data);
 
   const createHandleCourse = (e) => {
     e.preventDefault();
-    createCourse(formData);
+    if (!formData.name.trim()) {
+      return toast.error("Kurs nomi majburiy!");
+    }
+    createCourse({
+      name: formData.name.trim(),
+      description: formData.description.trim() || undefined, // description ixtiyoriy
+    });
     setFormData(initialState);
     setCreateHide(false);
   };
 
   useEffect(() => {
     if (isSuccess) {
-      toast.success("Kurs muoffaqiyatli yaratildi");
+      toast.success("Kurs muvaffaqiyatli yaratildi");
     }
   }, [isSuccess]);
 
@@ -76,40 +79,31 @@ const Course = () => {
 
   const handleEdit = (course) => {
     setEditingCourse(course);
-    setFormData({ name: course.name, description: course.description });
+    setFormData({ name: course.name, description: course.description || "" });
     setCourseHide(true);
   };
 
   const handleUpdate = (e) => {
     e.preventDefault();
-
     if (!formData.name.trim()) {
       return toast.error("Kurs nomi majburiy!");
     }
-    if (
-      !formData.description.trim() ||
-      formData.description.trim().length < 10
-    ) {
-      return toast.error("Tavsif kamida 10 ta belgidan iborat bo‘lishi kerak!");
-    }
-
     update({
-      id: editingCourse.id, // bu query param sifatida yuboriladi
+      id: editingCourse.id,
       body: {
         name: formData.name.trim(),
-        description: formData.description.trim(),
+        description: formData.description.trim() || undefined, // description ixtiyoriy
       },
     });
-
     setCourseHide(false);
     setEditingCourse(null);
     setFormData(initialState);
-    toast.success("Kurs muoffaqiyatli yangilandi");
+    toast.success("Kurs muvaffaqiyatli yangilandi");
   };
 
   const handleDelete = (id) => {
     deleteCourse(id);
-    toast.success("Kurs muoffaqiyatli o'chirildi");
+    toast.success("Kurs muvaffaqiyatli o'chirildi");
   };
 
   const filteredAndSortedCourses = useMemo(() => {
@@ -387,14 +381,12 @@ const Course = () => {
           width="300px"
         />
       )}
-
-      {createHide && (
+{createHide && (
         <Module close={setCreateHide} bg={"#aaa6"} width={"500px"}>
           <div className="modal-content">
             <div className="modal-header">
               <h2 className="modal-title">Yangi Kurs Yaratish</h2>
             </div>
-
             <form className="modal-form" onSubmit={createHandleCourse}>
               <div className="form-group">
                 <label className="form-label">Kurs nomi</label>
@@ -408,20 +400,17 @@ const Course = () => {
                   className="form-input"
                 />
               </div>
-
               <div className="form-group">
-                <label className="form-label">Tavsif</label>
+                <label className="form-label">Tavsif (ixtiyoriy)</label>
                 <textarea
-                  type="text"
                   value={formData.description}
                   onChange={handleChange}
                   name="description"
-                  placeholder="Kurs tavsifini kiriting"
+                  placeholder="Kurs tavsifini kiriting (ixtiyoriy)"
                   rows="4"
                   className="form-textarea"
                 />
               </div>
-
               <div className="form-actions">
                 <button
                   type="button"
@@ -439,14 +428,12 @@ const Course = () => {
           </div>
         </Module>
       )}
-
       {courseHide && (
         <Module close={setCourseHide} bg={"#aaa6"} width={"500px"}>
           <div className="modal-content">
             <div className="modal-header">
               <h2 className="modal-title">Kursni Tahrirlash</h2>
             </div>
-
             <form className="modal-form" onSubmit={handleUpdate}>
               <div className="form-group">
                 <label className="form-label">Kurs nomi</label>
@@ -459,11 +446,9 @@ const Course = () => {
                   className="form-input"
                 />
               </div>
-
               <div className="form-group">
-                <label className="form-label">Tavsif</label>
+                <label className="form-label">Tavsif (ixtiyoriy)</label>
                 <textarea
-                  required
                   value={formData.description}
                   onChange={handleChange}
                   name="description"
@@ -471,7 +456,6 @@ const Course = () => {
                   className="form-textarea"
                 />
               </div>
-
               <div className="form-actions">
                 <button
                   type="button"
