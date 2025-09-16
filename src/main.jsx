@@ -8,6 +8,7 @@ import { store } from "./context/index.js";
 import "./lang/i18n.js";
 import Lazy from "./components/lazy/Lazy.jsx";
 
+
 createRoot(document.getElementById("root")).render(
   <StrictMode>
     <Suspense fallback={<Lazy />}>
